@@ -1,0 +1,15 @@
+airbnb:
+  outputs:
+    dev:
+      account: mvahxlj-zm27458
+      database: airbnb
+      private_key: "{{ env_var('DBT_PRIVATE_KEY') }}" 
+      private_key_passphrase: abc
+      # private_key_path: ~/.ssh/sf_rsa_key.p8
+      role: TRANSFORM
+      schema: dev
+      threads: 1
+      type: snowflake
+      user: dbt
+      warehouse: xsmall_wh_airbnb
+  target: dev

@@ -1,0 +1,1 @@
+-- DBT or data build tool solves data collection, data wrangling/transformation, data modeling, data testing, data documentation and data integration.

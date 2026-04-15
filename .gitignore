@@ -1,0 +1,14 @@
+tmp-files/
+.venv
+
+# Snowflake keys
+*.p8
+*.pub
+
+# dbt
+.user.yml
+
+# OS
+.DS_Store
+
+logs

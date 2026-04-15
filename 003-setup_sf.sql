@@ -1,0 +1,155 @@
+-- CREATE WAREHOUSE AND DATABASE
+USE ROLE SYSADMIN;
+
+CREATE WAREHOUSE xsmall_wh_airbnb
+WITH WAREHOUSE_SIZE = 'XSMALL'
+AUTO_SUSPEND = 60          
+AUTO_RESUME = TRUE         
+INITIALLY_SUSPENDED = TRUE;
+
+CREATE OR REPLACE DATABASE AIRBNB;
+CREATE OR REPLACE SCHEMA AIRBNB.RAW;
+CREATE OR REPLACE SCHEMA AIRBNB.DEV;
+
+USE ROLE USERADMIN;
+CREATE OR REPLACE ROLE transform;
+CREATE OR REPLACE USER dbt
+LOGIN_NAME = 'dbt'
+TYPE=SERVICE
+RSA_PUBLIC_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7byOcu7uQAwq6YRR5q9P
+iVSmZsFKztsZ0YSltcfplod77FlPNM2XepIBvAC5MZI7X0vX1sUbvW0JIbQ+1RQL
+KkXRGBrv6KK8C5ZFKjKWiQyoddhZHw42AQWT1OqjJSPzTsjl8fOyHsU7061GVJAp
+6FKaL17L7PYtVdmGs7k+/rV/Sx/0BSb+wzdOuGtBE621a3OkhPiDUvskvRLnwyKA
+Um1+aEGsu/WfTgduPewBdH0akkH2MUWhSuJ5z+UFdrXA/Gyk5rgWnZKqYcbZHeRj
+vLF8SdV4QRRo5qONdERPoIc+wCKYd6HRAwjNRk2QvbAbkNv3peMrZ7H0YdVkOo2K
+kQIDAQAB'
+DEFAULT_ROLE = transform
+DEFAULT_WAREHOUSE = 'xsmall_wh_airbnb'
+DEFAULT_NAMESPACE = 'AIRBNB.RAW';
+
+
+-- CONNECT THE HIERARCHY AND THE USER
+USE ROLE SECURITYADMIN;
+GRANT ROLE transform TO USER dbt;
+GRANT ROLE transform TO ROLE SYSADMIN;
+
+
+-- GRANT OPERATIONAL PRIVILEGES
+USE ROLE ACCOUNTADMIN;
+GRANT ALL ON WAREHOUSE xsmall_wh_airbnb TO ROLE TRANSFORM;
+GRANT ALL ON DATABASE AIRBNB to ROLE TRANSFORM;
+GRANT ALL ON ALL SCHEMAS IN DATABASE AIRBNB to ROLE TRANSFORM;
+GRANT ALL ON FUTURE SCHEMAS IN DATABASE AIRBNB to ROLE TRANSFORM;
+GRANT ALL ON ALL TABLES IN SCHEMA AIRBNB.RAW to ROLE TRANSFORM;
+GRANT ALL ON FUTURE TABLES IN SCHEMA AIRBNB.RAW to ROLE TRANSFORM;
+
+
+-- CREATE OUR THREE TABLES AND IMPORT THE DATA FROM S3
+USE ROLE TRANSFORM;
+USE DATABASE AIRBNB;
+USE SCHEMA RAW;
+CREATE
+OR REPLACE TABLE AIRBNB.RAW.raw_listings (
+    id integer,
+    listing_url string,
+    name string,
+    room_type string,
+    minimum_nights integer,
+    host_id integer,
+    price string,
+    created_at datetime,
+    updated_at datetime
+);
+
+-- Importing data from S3 into the raw_listings table in Snowflake.
+COPY INTO AIRBNB.RAW.raw_listings (
+    id,
+    listing_url,
+    name,
+    room_type,
+    minimum_nights,
+    host_id,
+    price,
+    created_at,
+    updated_at
+)
+from
+    's3://dbt-datasets/listings.csv' FILE_FORMAT = (
+        type = 'CSV' skip_header = 1 FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+    );
+
+
+CREATE
+OR REPLACE TABLE AIRBNB.RAW.raw_reviews (
+    listing_id integer,
+    date datetime,
+    reviewer_name string,
+    comments string,
+    sentiment string
+);
+
+COPY INTO AIRBNB.RAW.raw_reviews (
+    listing_id,
+    date,
+    reviewer_name,
+    comments,
+    sentiment
+)
+from
+    's3://dbt-datasets/reviews.csv' FILE_FORMAT = (
+        type = 'CSV' skip_header = 1 FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+    );
+
+CREATE
+OR REPLACE TABLE AIRBNB.RAW.raw_hosts (
+    id integer,
+    name string,
+    is_superhost string,
+    created_at datetime,
+    updated_at datetime
+);
+
+COPY INTO AIRBNB.RAW.raw_hosts (id, name, is_superhost, created_at, updated_at)
+from
+    's3://dbt-datasets/hosts.csv' FILE_FORMAT = (
+        type = 'CSV' skip_header = 1 FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+    );
+
+
+SELECT * FROM AIRBNB.RAW.raw_listings LIMIT 10;
+SELECT * FROM AIRBNB.RAW.raw_reviews LIMIT 10;
+SELECT * FROM AIRBNB.RAW.raw_hosts LIMIT 10;
+
+
+-- USER FOR PRESET.IO
+USE ROLE USERADMIN;
+CREATE OR REPLACE ROLE reporter;
+CREATE OR REPLACE USER preset
+LOGIN_NAME = 'preset'
+TYPE=SERVICE
+RSA_PUBLIC_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7byOcu7uQAwq6YRR5q9P
+iVSmZsFKztsZ0YSltcfplod77FlPNM2XepIBvAC5MZI7X0vX1sUbvW0JIbQ+1RQL
+KkXRGBrv6KK8C5ZFKjKWiQyoddhZHw42AQWT1OqjJSPzTsjl8fOyHsU7061GVJAp
+6FKaL17L7PYtVdmGs7k+/rV/Sx/0BSb+wzdOuGtBE621a3OkhPiDUvskvRLnwyKA
+Um1+aEGsu/WfTgduPewBdH0akkH2MUWhSuJ5z+UFdrXA/Gyk5rgWnZKqYcbZHeRj
+vLF8SdV4QRRo5qONdERPoIc+wCKYd6HRAwjNRk2QvbAbkNv3peMrZ7H0YdVkOo2K
+kQIDAQAB'
+DEFAULT_ROLE = reporter
+DEFAULT_WAREHOUSE = 'xsmall_wh_airbnb'
+DEFAULT_NAMESPACE = 'AIRBNB.DEV'
+COMMENT = 'Preset user for creating reports and dashboards';
+
+
+-- CONNECT THE HIERARCHY AND THE USER
+USE ROLE SECURITYADMIN;
+GRANT ROLE reporter TO USER preset;
+GRANT ROLE reporter TO ROLE SYSADMIN;
+
+-- GRANT OPERATIONAL PRIVILEGES
+USE ROLE ACCOUNTADMIN;
+GRANT ALL ON WAREHOUSE xsmall_wh_airbnb TO ROLE REPORTER;
+GRANT USAGE ON DATABASE AIRBNB to ROLE REPORTER;
+GRANT USAGE ON ALL SCHEMAS IN DATABASE AIRBNB to ROLE REPORTER;
+GRANT USAGE ON FUTURE SCHEMAS IN DATABASE AIRBNB to ROLE REPORTER;
+GRANT SELECT ON ALL TABLES IN SCHEMA AIRBNB.DEV to ROLE REPORTER;
+GRANT SELECT ON FUTURE TABLES IN SCHEMA AIRBNB.DEV to ROLE REPORTER;
