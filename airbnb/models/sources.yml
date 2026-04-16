@@ -1,0 +1,18 @@
+version: 2
+sources:
+  - name: airbnb
+    schema: raw
+    tables:
+      - name: listings
+        identifier: raw_listings
+
+      - name: hosts
+        identifier: raw_hosts
+
+      - name: reviews
+        identifier: raw_reviews
+        config:
+          loaded_at_field: date
+          freshness:
+            warn_after: {count: 1, period: hour} # most recent data is more than 1h past
+            # error_after: {count: 4, period: hour}

@@ -32,5 +32,7 @@ clean-targets:         # directories to be removed by `dbt clean`
 models:
   airbnb:
     +materialized: view
+    src:
+      +materialized: ephemeral # BEcause these were views before, we need to delete them manually as dbt run won't be deleting the views. It will just create the new CTEs.
     dim:
-      +materialized: table
+      +materialized: view

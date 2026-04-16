@@ -1,7 +1,7 @@
--- This will be a view.
+-- This will be a view which is the default materialization in DBT.
 WITH raw_listings AS (
     SELECT *
-    FROM AIRBNB.RAW.RAW_LISTINGS
+    FROM {{ source('airbnb', 'listings') }}
 )
 SELECT
     id AS listing_id,
